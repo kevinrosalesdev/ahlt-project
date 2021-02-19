@@ -3,7 +3,7 @@ import sys
 from eval import evaluator
 from os import listdir
 from xml.dom.minidom import parse
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, TreebankWordTokenizer as twt
 
 
 def tokenize(s):
@@ -22,7 +22,8 @@ def tokenize(s):
          ("aspirin",15,21), (",",22,22), ("and",24,26), ("the",28,30),
          ("common",32,37), ("cold",39,42), (".",43,43)]
     """
-    return word_tokenize(s)
+    raw_list = list(zip(word_tokenize(s), list(twt().span_tokenize(s))))
+    return [(token, offset_1, offset_2-1) for token, (offset_1, offset_2) in raw_list]
 
 
 def extract_entities(s):
@@ -41,8 +42,14 @@ def extract_entities(s):
         [{"name":"Ascorbic acid", "offset":"0-12", "type":"drug"},
         {"name":"aspirin", "offset":"15-21", "type":"brand"}]
     """
-    return [{"name": "Ascorbic acid", "offset": "0-12", "type": "drug"},
-            {"name": "aspirin", "offset": "15-21", "type": "brand"}]
+    entities = []
+    for token in s:
+        # TODO: Chain of Rules filtering & classifying tokens should be here!
+        entities.append({"name": token[0],
+                         "offset": f"{token[1]}-{token[2]}",
+                         "type": "drug"})
+
+    return entities
 
 
 if __name__ == '__main__':
