@@ -8,7 +8,7 @@ from nltk.tokenize import word_tokenize, TreebankWordTokenizer as twt
 
 def load_drug_bank():
     print("Loading Drug Bank...")
-    f = open("resources/DrugBank.txt", 'r')
+    f = open("resources/DrugBank.txt", 'r', encoding="utf8")
     lines = f.readlines()  # array of file lines
     drug_bank_names = []
     drug_bank_types = []
@@ -24,7 +24,7 @@ def load_hsdb():
     f = open("resources/HSDB.txt", 'r')
     lines = f.readlines()  # array of file lines
     hsdb_names = [line.strip() for line in lines]
-    hsdb_types = ['drug']*len(lines)
+    hsdb_types = ['drug'] * len(lines)
     return hsdb_names, hsdb_types
 
 
@@ -52,7 +52,7 @@ def use_external_resources(token, drug_bank_names, drug_bank_types):
     try:
         return drug_bank_types[drug_bank_names.index(token)]
     except:
-        return 'drug'
+        return 'none'
 
 
 def extract_entities(s, drug_bank_names, drug_bank_types):
@@ -72,12 +72,97 @@ def extract_entities(s, drug_bank_names, drug_bank_types):
         {"name":"aspirin", "offset":"15-21", "type":"brand"}]
     """
     entities = []
-    for token in s:
-        # TODO: Chain of Rules filtering & classifying tokens should be here!
-        type = use_external_resources(token[0], drug_bank_names, drug_bank_types)
-        entities.append({"name": token[0],
-                         "offset": f"{token[1]}-{token[2]}",
-                         "type": type})
+    for i, token in enumerate(s):
+        # #Use external resources
+        # type = use_external_resources(token[0], drug_bank_names, drug_bank_types)
+        # if type == 'none':
+        #     pass
+        # else:
+        #     entities.append({"name": token[0],
+        #                      "offset": f"{token[1]}-{token[2]}",
+        #                      "type": type})
+
+        # If word is fully capitalized, assign brand
+        if token[0].isupper():
+            type = 'brand'
+            entities.append({"name": token[0],
+                             "offset": f"{token[1]}-{token[2]}",
+                             "type": type})
+            continue
+
+        # # If token contains numbers, assign drug //Reduces F1
+        # number_found = False
+        # for number in range(10):
+        #     if (str(number) in token[0]) & ('-' in token[0]):
+        #         type = 'drug'
+        #         entities.append({"name": token[0],
+        #                          "offset": f"{token[1]}-{token[2]}",
+        #                          "type": type})
+        #         number_found = True
+        #         break
+        # if number_found:
+        #     continue
+
+        # If affix found in list, assign drug
+        drug_affixes = ['acin', 'acin', 'adrine', 'afil', 'afine', 'aine', 'aline', 'alone', 'amide', 'amil', 'amine',
+                   'ampin', 'apine', 'apine', 'apride', 'arin', 'avir', 'azine', 'azole', 'azone', 'bital', 'chlor',
+                   'cycline', 'drone', 'eine', 'emide', 'epine', 'esin', 'etate', 'etin', 'etine', 'etine', 'fen',
+                   'icin', 'idine', 'ipin', 'ipine', 'isone', 'itone', 'lide', 'llin', 'lline', 'meth', 'micin',
+                   'mycin', 'ocine', 'odone', 'nol','hol', 'olimus', 'olin', 'oline', 'olone', 'omide', 'onide', 'orin',
+                   'osine', 'otine', 'oxacin', 'oxib', 'oxide', 'oxin', 'oxone', 'oxy', 'phen', 'phine', 'phrine',
+                   'rtan', 'strel', 'tatin', 'taxel', 'thane', 'udine', 'ulin', 'utin', 'ycine', 'zepam', 'zine','atrin',
+                   'afil','toin','oprim','axel']
+        affix_found = False
+        for affix in drug_affixes:
+            if affix in token[0]:
+                type = 'drug'
+                entities.append({"name": token[0],
+                                 "offset": f"{token[1]}-{token[2]}",
+                                 "type": type})
+                affix_found = True
+                break
+        if affix_found:
+            continue
+
+        # If affix found in list assign group
+        group_affixes = ['oid','oids','osides']
+        affix_found = False
+        for affix in group_affixes:
+            if affix in token[0]:
+                type = 'group'
+                entities.append({"name": token[0],
+                                 "offset": f"{token[1]}-{token[2]}",
+                                 "type": type})
+                affix_found = True
+                break
+        if affix_found:
+            continue
+
+        # #Glueing for groups, no added tp increases fp
+        # if token[0] in ['agents','derivatives','depressants']:
+        #     type = 'group'
+        #     entities.append({"name": f'{s[i-1]} {token[0]}',
+        #                      "offset": f"{s[i-1][1]}-{token[2]}",
+        #                      "type": type})
+        #     continue
+
+
+        # # Join words ending in -ic with the next word and assign drug//Reduces F1
+        # if token[0][-2:] == 'ic':
+        #     type = 'drug'
+        #     entities.append({"name": f'{token[0]} {s[i+1]}',
+        #                      "offset": f"{token[1]}-{s[i+1][2]}",
+        #                      "type": type})
+        #     continue
+        # # Join words ending in -ate with the previous word and assign drug//Reduces F1
+        # if token[0][-3:] == 'ate':
+        #     type = 'drug'
+        #     entities.append({"name": f'{s[i-1]} {token[0]}',
+        #                      "offset": f"{s[i-1][1]}-{token[2]}",
+        #                      "type": type})
+        #     continue
+
+
 
     return entities
 
