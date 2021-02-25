@@ -1,5 +1,6 @@
 import sys
 import re
+import numpy as np
 
 from nltk.corpus import stopwords
 
@@ -17,7 +18,7 @@ def load_drug_bank():
     drug_bank_types = []
     for line in lines:
         line = line.strip().split("|")
-        drug_bank_names.append(line[0])
+        drug_bank_names.append(line[0].lower())
         drug_bank_types.append(line[1])
     return drug_bank_names, drug_bank_types
 
@@ -26,7 +27,7 @@ def load_hsdb():
     print("Loading HSDB...")
     f = open("resources/HSDB.txt", 'r')
     lines = f.readlines()  # array of file lines
-    hsdb_names = [line.strip() for line in lines]
+    hsdb_names = [line.strip().lower() for line in lines]
     hsdb_types = ['drug'] * len(lines)
     return hsdb_names, hsdb_types
 
@@ -52,13 +53,18 @@ def tokenize(s):
 
 
 def use_external_resources(token, drug_bank_names, drug_bank_types):
-    try:
-        return drug_bank_types[drug_bank_names.index(token)]
-    except:
-        return None
+    possible_types = drug_bank_types[np.where(drug_bank_names == token)]
+    if np.where(possible_types == 'drug')[0].size != 0:
+        return 'drug'
+    if np.where(possible_types == 'group')[0].size != 0:
+        return 'group'
+    if np.where(possible_types == 'brand')[0].size != 0:
+        return 'brand'
+
+    return None
 
 
-def extract_entities(s, drug_bank_names, drug_bank_types, stopwords):
+def extract_entities(s, drug_bank_names, drug_bank_types, stopwords, look_er=True):
     """
     Task:
         Given a tokenized sentence, identify which tokens (or groups of
@@ -78,61 +84,41 @@ def extract_entities(s, drug_bank_names, drug_bank_types, stopwords):
     for i, token in enumerate(s):
         # Use external resources
         # print(f"Index:{i+1}/{len(s)} -> {token}")
-        type = use_external_resources(token[0], drug_bank_names, drug_bank_types)
-        if type is not None:
-            print("\tReason: ER (Drug)", token[0])
-            entities.append({"name": token[0],
-                             "offset": f"{token[1]}-{token[2]}",
-                             "type": type})
-            continue
-
-        type = use_external_resources(token[0].lower(), drug_bank_names, drug_bank_types)
-        if type is not None:
-            print("\tReason: ER (Drug)", token[0])
-            entities.append({"name": token[0],
-                             "offset": f"{token[1]}-{token[2]}",
-                             "type": type})
-            continue
-
-        type = use_external_resources(token[0].upper(), drug_bank_names, drug_bank_types)
-        if type is not None:
-            print("\tReason: ER (Drug)", token[0])
-            entities.append({"name": token[0],
-                             "offset": f"{token[1]}-{token[2]}",
-                             "type": type})
-            continue
-
-        if i + 1 < len(s):
-            glued_token = (tokens[i][0] + " " + tokens[i + 1][0], tokens[i][1], tokens[i + 1][2])
-            type = use_external_resources(glued_token[0], drug_bank_names, drug_bank_types)
+        if look_er:
+            type = use_external_resources(token[0].lower(), drug_bank_names, drug_bank_types)
             if type is not None:
-                print("\tReason: ER (GLUED) (Drug)", glued_token[0])
-                entities.append({"name": glued_token[0],
-                                 "offset": f"{glued_token[1]}-{glued_token[2]}",
+                print(f"\tReason: ER ({type})", token[0])
+                entities.append({"name": token[0],
+                                 "offset": f"{token[1]}-{token[2]}",
                                  "type": type})
                 continue
 
-            type = use_external_resources(glued_token[0].lower(), drug_bank_names, drug_bank_types)
-            if type is not None:
-                print("\tReason: ER (GLUED) (Drug)", glued_token[0])
-                entities.append({"name": glued_token[0],
-                                 "offset": f"{glued_token[1]}-{glued_token[2]}",
-                                 "type": type})
-                continue
+            if i + 1 < len(s):
+                glued_token = (tokens[i][0] + " " + tokens[i + 1][0], tokens[i][1], tokens[i + 1][2])
+                type = use_external_resources(glued_token[0].lower(), drug_bank_names, drug_bank_types)
+                if type is not None:
+                    print(f"\tReason: ER (GLUED) ({type})", glued_token[0])
+                    entities.append({"name": glued_token[0],
+                                     "offset": f"{glued_token[1]}-{glued_token[2]}",
+                                     "type": type})
+                    continue
 
-            type = use_external_resources(glued_token[0].upper(), drug_bank_names, drug_bank_types)
-            if type is not None:
-                print("\tReason: ER (GLUED) (Drug)", glued_token[0])
-                entities.append({"name": glued_token[0],
-                                 "offset": f"{glued_token[1]}-{glued_token[2]}",
-                                 "type": type})
-                continue
+            if i + 2 < len(s):
+                glued_token = (tokens[i][0] + " " + tokens[i + 1][0] + " " + tokens[i + 2][0],
+                               tokens[i][1], tokens[i + 2][2])
+                type = use_external_resources(glued_token[0].lower(), drug_bank_names, drug_bank_types)
+                if type is not None:
+                    print(f"\tReason: ER (GLUED) ({type})", glued_token[0])
+                    entities.append({"name": glued_token[0],
+                                     "offset": f"{glued_token[1]}-{glued_token[2]}",
+                                     "type": type})
+                    continue
 
         if len(token[0]) <= 5 or len(re.findall(r'[A-Z|a-z]', token[0])) <= 3 or token[0].lower() in stopwords:
             continue
 
         # If suffix found in list assign group
-        group_suffixes = ['oid', 'oids', 'osides']
+        group_suffixes = ['oid', 'oids', 'osides$']
         if re.findall("$|".join(group_suffixes), token[0]):
             print("\tReason: Suffix (Group)", token[0])
             entities.append({"name": token[0],
@@ -143,15 +129,14 @@ def extract_entities(s, drug_bank_names, drug_bank_types, stopwords):
         # If suffix found in list, assign drug
         drug_suffixes = ['acin', 'acin', 'adrine', 'afil', 'afine', 'aine', 'aline', 'alone', 'amide', 'amil', 'amine',
                          'ampin', 'apine', 'apine', 'apride', 'arin', 'avir', 'azine', 'azole', 'azone', 'bital',
-                         'chlor',
                          'cycline', 'drone', 'eine', 'emide', 'epine', 'esin', 'etate', 'etin', 'etine', 'etine', 'fen',
-                         'icin', 'idine', 'ipin', 'ipine', 'isone', 'itone', 'lide', 'llin', 'lline', 'meth', 'micin',
+                         'icin', 'idine', 'ipin', 'ipine', 'isone', 'itone', 'lide', 'llin', 'lline', 'micin',
                          'mycin', 'ocine', 'odone', 'nol', 'hol', 'olimus', 'olin', 'oline', 'olone', 'omide', 'onide',
                          'orin',
-                         'osine', 'otine', 'oxacin', 'oxib', 'oxide', 'oxin', 'oxone', 'oxy', 'phen', 'phine', 'phrine',
+                         'osine', 'otine', 'oxacin', 'oxib', 'oxide', 'oxin', 'oxone', 'phine', 'phrine',
                          'rtan', 'strel', 'tatin', 'taxel', 'thane', 'udine', 'ulin', 'utin', 'ycine', 'zepam', 'zine',
                          'atrin',
-                         'afil', 'toin', 'oprim', 'axel']
+                         'afil', 'toin', 'oprim', 'axel$']
         if re.findall("$|".join(drug_suffixes), token[0]):
             print("\tReason: Suffix (Drug)", token[0])
             entities.append({"name": token[0],
@@ -159,13 +144,6 @@ def extract_entities(s, drug_bank_names, drug_bank_types, stopwords):
                              "type": 'drug'})
             continue
 
-        # If token contains numbers, assign drug
-        if re.findall(r'([A-Z]+|[a-z]+)[0-9]+', token[0]) and re.findall(r'-+', token[0]):
-            print("\tReason: Numbers + Hyphen (Drug)", token[0])
-            entities.append({"name": token[0],
-                             "offset": f"{token[1]}-{token[2]}",
-                             "type": 'drug'})
-            continue
 
         # If word is fully capitalized, assign brand
         if token[0].isupper():
@@ -174,30 +152,6 @@ def extract_entities(s, drug_bank_names, drug_bank_types, stopwords):
                              "offset": f"{token[1]}-{token[2]}",
                              "type": 'brand'})
             continue
-
-        # # Glueing for groups, no added tp increases fp
-        # if token[0] in ['agents','derivatives','depressants']:
-        #     type = 'group'
-        #     entities.append({"name": f'{s[i-1]} {token[0]}',
-        #                      "offset": f"{s[i-1][1]}-{token[2]}",
-        #                      "type": type})
-        #     continue
-
-        # # Join words ending in -ic with the next word and assign drug //Reduces F1
-        # if token[0][-2:] == 'ic':
-        #     type = 'drug'
-        #     entities.append({"name": f'{token[0]} {s[i+1]}',
-        #                      "offset": f"{token[1]}-{s[i+1][2]}",
-        #                      "type": type})
-        #     continue
-
-        # # Join words ending in -ate with the previous word and assign drug //Reduces F1
-        # if token[0][-3:] == 'ate':
-        #     type = 'drug'
-        #     entities.append({"name": f'{s[i-1]} {token[0]}',
-        #                      "offset": f"{s[i-1][1]}-{token[2]}",
-        #                      "type": type})
-        #     continue
 
     return entities
 
@@ -211,17 +165,22 @@ if __name__ == '__main__':
     hsdb_names, hsdb_types = load_hsdb()
     drug_bank_names.extend(hsdb_names)
     drug_bank_types.extend(hsdb_types)
+    drug_bank_names = np.array(drug_bank_names)
+    drug_bank_types = np.array(drug_bank_types)
 
     # process each file in directory
     for idx, f in enumerate(listdir(datadir), 1):
         print(f"Processing file nº {idx}/{len(listdir(datadir))}")
+
         # parse XML file, obtaining a DOM tree
         tree = parse(datadir + "/" + f)
         # process each sentence in the file
         sentences = tree.getElementsByTagName("sentence")
+        # print("File:", f)
         for s in sentences:
             sid = s.attributes["id"].value  # get sentence id
             stext = s.attributes["text"].value  # get sentence text
+            # print("Sentence:", stext)
             # tokenize text
             tokens = tokenize(stext)
             # extract entities from tokenized sentence text
