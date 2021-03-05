@@ -46,10 +46,9 @@ def extract_features(s):
             ["form=aspirin","suf4=irin","next=,","prev=,"],
             ...]
     """
-    return [[]]
+    return [["form=Ascorbic", "suf4=rbic", "next=acid", "prev=_BoS_", "capitalized"]]*len(s)
 
 
-# TODO
 def get_tag(token, gold):
     """
     Task:
@@ -70,10 +69,21 @@ def get_tag(token, gold):
         >> get_tag (("aspirin",15,21), [(0, 12,"drug"), (15, 21,"brand") ])
         B-brand
     """
-    return ""
+    for gte in gold:
+        if token[1] >= gte[0] and token[2] <= gte[1]:
+            if token[1] == gte[0]:
+                return "B-" + gte[2]
+            return "I-" + gte[2]
+
+    return "O"
 
 
 if __name__ == '__main__':
+    print(get_tag(("Ascorbic", 0, 7), [(0, 12, "drug"), (15, 21, "brand")]))
+    print(get_tag(("acid", 9, 12), [(0, 12, "drug"), (15, 21, "brand")]))
+    print(get_tag(("common", 32, 37), [(0, 12, "drug"), (15, 21, "brand")]))
+    print(get_tag(("aspirin", 15, 21), [(0, 12, "drug"), (15, 21, "brand")]), "\n")
+
     datadir = sys.argv[1]
 
     # process each file in directory
