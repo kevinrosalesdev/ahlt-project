@@ -23,9 +23,41 @@ def output_entities(sid, tokens, tags):
         DDI-DrugBank.d553.s0|0-12|Ascorbic acid|drug
         DDI-DrugBank.d553.s0|15-21|aspirin|brand
     """
+    last_found = 'O'
+    for index in range(len(tokens)):
+        if tags[index][0] == 'B':
+            # B-tag & the last tag was different to O-tag -> New entity must be printed.
+            if last_found != 'O':
+                print(f"{sid}|{offset[0]}-{offset[1]}|{name}|{type}")
+
+            name = tokens[index][0]
+            offset = [tokens[index][1], tokens[index][2]]
+            type = tags[index][2:]
+            last_found = 'B'
+
+        elif tags[index][0] == 'I':
+            name += " " + tokens[index][0]
+            offset[1] = tokens[index][2]
+            last_found = 'I'
+
+        else:
+            # O-tag & the last tag was different to O-tag -> New entity must be printed.
+            if last_found != 'O':
+                print(f"{sid}|{offset[0]}-{offset[1]}|{name}|{type}")
+            last_found = 'O'
+
+    # If the last tag of the array was different from O, it must be printed too.
+    if last_found != 'O':
+        print(f"{sid}|{offset[0]}-{offset[1]}|{name}|{type}")
 
 
 if __name__ == '__main__':
-    model_name = sys.argv[1]
-    features = sys.argv[2]
-    pass
+    output_entities("DDI-DrugBank.d553.s0",
+                    [("Ascorbic", 0, 7), ("acid", 9, 12),
+                     ("aspirin", 15, 21), (",", 22, 22), ("and", 24, 26),
+                     ("the", 28, 30), ("common", 32, 37), ("cold", 39, 42)],
+                    ["B-drug", "I-drug", "B-brand", "O", "O", "O", "O", "O"])
+
+    # model_name = sys.argv[1]
+    # features = sys.argv[2]
+    # pass
