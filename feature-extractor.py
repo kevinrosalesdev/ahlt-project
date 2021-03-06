@@ -46,7 +46,37 @@ def extract_features(s):
             ["form=aspirin","suf4=irin","next=,","prev=,"],
             ...]
     """
-    return [["form=Ascorbic", "suf4=rbic", "next=acid", "prev=_BoS_", "capitalized"]]*len(s)
+    output=[]
+    slen=len(s)
+    for i,token in enumerate(s):
+        features=[]
+
+        #Form
+        features.append(f'form={token[0]}')
+
+        #Suffix 4
+        features.append(f'suf4={token[0][-4:]}')
+
+        #Next token
+        if i!=slen-1:
+            features.append(f'next={s[i+1][0]}')
+        else:
+            features.append('next=_EoS_')
+
+        #Previous token
+        if i!=0:
+            features.append(f'prev={s[i-1][0]}')
+        else:
+            features.append('prev=_BoS_')
+
+        #Capitalized
+
+        if token[0][0].isupper():
+            features.append('capitalized')
+
+        output.append(features)
+
+    return output
 
 
 def get_tag(token, gold):
@@ -79,16 +109,10 @@ def get_tag(token, gold):
 
 
 if __name__ == '__main__':
-    print(get_tag(("Ascorbic", 0, 7), [(0, 12, "drug"), (15, 21, "brand")]))
-    print(get_tag(("acid", 9, 12), [(0, 12, "drug"), (15, 21, "brand")]))
-    print(get_tag(("common", 32, 37), [(0, 12, "drug"), (15, 21, "brand")]))
-    print(get_tag(("aspirin", 15, 21), [(0, 12, "drug"), (15, 21, "brand")]), "\n")
-
     datadir = sys.argv[1]
 
     # process each file in directory
     for idx, f in enumerate(listdir(datadir), 1):
-        print(f"Processing file nº {idx}/{len(listdir(datadir))}")
 
         # parse XML file, obtaining a DOM tree
         tree = parse(datadir + "/" + f)

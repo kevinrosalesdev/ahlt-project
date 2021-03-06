@@ -1,5 +1,6 @@
 import sys
-
+import pycrfsuite
+from learner import read_features
 
 def output_entities(sid, tokens, tags):
     """
@@ -52,12 +53,18 @@ def output_entities(sid, tokens, tags):
 
 
 if __name__ == '__main__':
-    output_entities("DDI-DrugBank.d553.s0",
-                    [("Ascorbic", 0, 7), ("acid", 9, 12),
-                     ("aspirin", 15, 21), (",", 22, 22), ("and", 24, 26),
-                     ("the", 28, 30), ("common", 32, 37), ("cold", 39, 42)],
-                    ["B-drug", "I-drug", "B-brand", "O", "O", "O", "O", "O"])
+    # output_entities("DDI-DrugBank.d553.s0",
+    #                 [("Ascorbic", 0, 7), ("acid", 9, 12),
+    #                  ("aspirin", 15, 21), (",", 22, 22), ("and", 24, 26),
+    #                  ("the", 28, 30), ("common", 32, 37), ("cold", 39, 42)],
+    #                 ["B-drug", "I-drug", "B-brand", "O", "O", "O", "O", "O"])
 
-    # model_name = sys.argv[1]
-    # features = sys.argv[2]
-    # pass
+    model_name = sys.argv[1]
+    features = sys.argv[2]
+
+    tagger = pycrfsuite.Tagger()
+    tagger.open(f'{model_name}.crfsuite')
+    x,y,sids,infos=read_features(features)
+    for feats,labels,sid,info in zip(x,y,sids,infos):
+        output_entities(sid,info,tagger.tag(feats))
+
