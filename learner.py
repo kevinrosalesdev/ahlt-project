@@ -1,5 +1,3 @@
-# TODO: CRF
-# https://github.com/scrapinghub/python-crfsuite/blob/master/examples/CoNLL%202002.ipynb
 import sys
 import pycrfsuite
 

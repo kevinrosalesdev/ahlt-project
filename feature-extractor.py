@@ -1,3 +1,4 @@
+import re
 import sys
 
 from os import listdir
@@ -25,7 +26,6 @@ def tokenize(s):
     return [(token, offset_1, offset_2 - 1) for token, (offset_1, offset_2) in raw_list]
 
 
-# TODO
 def extract_features(s):
     """
     Task:
@@ -46,33 +46,57 @@ def extract_features(s):
             ["form=aspirin","suf4=irin","next=,","prev=,"],
             ...]
     """
-    output=[]
-    slen=len(s)
-    for i,token in enumerate(s):
-        features=[]
+    output = []
+    # pos_tags = [pos_tag[1] for pos_tag in pos_tag(word_tokenize(stext))]
 
-        #Form
+    for i, token in enumerate(s):
+        features = []
+
+        # Form
         features.append(f'form={token[0]}')
 
-        #Suffix 4
-        features.append(f'suf4={token[0][-4:]}')
+        # Suffix 5, 4, 3. The word length without suffix must be at least 2+len(suffix)
+        if len(token[0]) >= 7:
+            features.append(f'suf5={token[0][-5:]}')
+        if len(token[0]) >= 6:
+            features.append(f'suf4={token[0][-4:]}')
+        if len(token[0]) >= 5:
+            features.append(f'suf3={token[0][-3:]}')
 
-        #Next token
-        if i!=slen-1:
-            features.append(f'next={s[i+1][0]}')
+        # Suffix 2 and 1 (last characters of word)
+        if len(token[0]) >= 2:
+            features.append(f'suf2={token[0][-2:]}')
+        features.append(f'suf1={token[0][-1:]}')
+
+        # Next token (No suffix information as it decreases the M.F1)
+        if i != len(s) - 1:
+            features.append(f'next={s[i + 1][0]}')
         else:
             features.append('next=_EoS_')
 
-        #Previous token
-        if i!=0:
-            features.append(f'prev={s[i-1][0]}')
+        # Previous token (No suffix information as it decreases the M.F1)
+        if i != 0:
+            features.append(f'prev={s[i - 1][0]}')
         else:
             features.append('prev=_BoS_')
 
-        #Capitalized
-
+        # Capitalized
         if token[0][0].isupper():
             features.append('capitalized')
+
+        # With numbers
+        if re.findall(r'[0-9]+', token[0]):
+            features.append("number")
+
+        # With dashes
+        # if re.findall(r'-+', token[0]):
+        #     features.append("dash")
+
+        # Length
+        features.append(f'length={len(token[0])}')
+
+        # Pos Tag
+        # features.append(f'postag={pos_tags[i]}')
 
         output.append(features)
 
