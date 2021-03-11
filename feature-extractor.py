@@ -1,9 +1,42 @@
 import re
 import sys
+import numpy as np
 
 from os import listdir
 from xml.dom.minidom import parse
 from nltk.tokenize import word_tokenize, TreebankWordTokenizer as twt
+
+
+def load_drug_bank():
+    f = open("resources/DrugBank.txt", 'r', encoding="utf8")
+    lines = f.readlines()  # array of file lines
+    drug_bank_names = []
+    drug_bank_types = []
+    for line in lines:
+        line = line.strip().split("|")
+        drug_bank_names.append(line[0].lower())
+        drug_bank_types.append(line[1])
+    return drug_bank_names, drug_bank_types
+
+
+def load_hsdb():
+    f = open("resources/HSDB.txt", 'r')
+    lines = f.readlines()  # array of file lines
+    hsdb_names = [line.strip().lower() for line in lines]
+    hsdb_types = ['drug'] * len(lines)
+    return hsdb_names, hsdb_types
+
+
+def use_external_resources(token, drug_bank_names, drug_bank_types):
+    possible_types = drug_bank_types[np.where(drug_bank_names == token)]
+    if np.where(possible_types == 'drug')[0].size != 0:
+        return 'drug'
+    if np.where(possible_types == 'group')[0].size != 0:
+        return 'group'
+    if np.where(possible_types == 'brand')[0].size != 0:
+        return 'brand'
+
+    return None
 
 
 def tokenize(s):
@@ -26,7 +59,7 @@ def tokenize(s):
     return [(token, offset_1, offset_2 - 1) for token, (offset_1, offset_2) in raw_list]
 
 
-def extract_features(s):
+def extract_features(s, look_er=True):
     """
     Task:
         Given a tokenized sentence, return a feature vector for each token
@@ -48,6 +81,14 @@ def extract_features(s):
     """
     output = []
     # pos_tags = [pos_tag[1] for pos_tag in pos_tag(word_tokenize(stext))]
+
+    drug_bank_names, drug_bank_types = load_drug_bank()
+    hsdb_names, hsdb_types = load_hsdb()
+    drug_bank_names.extend(hsdb_names)
+    drug_bank_types.extend(hsdb_types)
+    drug_bank_names = np.array(drug_bank_names)
+    drug_bank_types = np.array(drug_bank_types)
+
 
     for i, token in enumerate(s):
         features = []
@@ -97,6 +138,11 @@ def extract_features(s):
 
         # Pos Tag
         # features.append(f'postag={pos_tags[i]}')
+
+        if look_er:
+            type = use_external_resources(token[0].lower(), drug_bank_names, drug_bank_types)
+            if type is not None:
+                features.append(f'ertype={type}')
 
         output.append(features)
 
