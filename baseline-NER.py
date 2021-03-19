@@ -4,7 +4,7 @@ import numpy as np
 
 from nltk.corpus import stopwords
 
-from eval import evaluator
+import evaluator
 from os import listdir
 from xml.dom.minidom import parse
 from nltk.tokenize import word_tokenize, TreebankWordTokenizer as twt
@@ -188,5 +188,6 @@ if __name__ == '__main__':
             # print sentence entities in format requested for evaluation
             for e in entities:
                 print(sid + "|" + e["offset"] + "|" + e["name"] + "|" + e["type"], file=outf)
+    outf.close()
     # print performance score
     evaluator.evaluate("NER", datadir, outfile)
