@@ -1,5 +1,7 @@
 import sys
 import evaluator
+import networkx as nx
+import matplotlib.pyplot as plt
 
 from os import listdir
 from xml.dom.minidom import parse
@@ -28,6 +30,8 @@ def analyze(s, parser):
         6:{’word’:’combining’,’head’:4,’lemma’:’combine’,’rel’:’advcl’,’tag’:’VBG’,’start’:33,’end’:41},
         7:{’word’:’resorcinol’,’head’:6,’lemma’:’resorcinol’,’rel’:’dobj’,’tag’:’NN’,’start’:43,’end’:52},
     """
+
+    # '%' is a reserved token for CoreNLP
     s = s.replace("%", "")
     if len(s) > 0:
         # parse text (as many times as needed).
@@ -42,7 +46,7 @@ def analyze(s, parser):
         return {}
 
 
-def check_interaction(analysis, entities, e1, e2):
+def check_interaction(analysis: DependencyGraph, entities, e1, e2):
     """
     Task:
         Decide whether a sentence is expressing a DDI between two drugs.
@@ -54,6 +58,33 @@ def check_interaction(analysis, entities, e1, e2):
         Returns the type of interaction (’effect’, ’mechanism’, ’advice’, ’int’)
         between e1 and e2 expressed by the sentence, or ’None’ if no interaction is described.
     """
+    offset_1 = entities[e1]
+    offset_2 = entities[e2]
+    # Some GT offsets are ""215-226;246-276" because the drug is not consecutive
+    if len(offset_1) > 2:
+        offset_1 = [offset_1[0], offset_1[2]]
+    if len(offset_2) > 2:
+        offset_2 = [offset_2[0], offset_2[2]]
+
+    idx_1 = 0
+    idx_2 = 0
+
+    for idx in range(1, len(analysis.nodes)):
+        for shift in range(0, 10):
+            if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
+                idx_1 = idx
+            if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
+                idx_2 = idx
+        if idx_1 != 0 and idx_2 != 0:
+            break
+
+    print(idx_1, idx_2)
+    nx.draw(analysis.nx_graph(), with_labels=True)
+    plt.show()
+    exit()
+
     return "effect"
 
 
