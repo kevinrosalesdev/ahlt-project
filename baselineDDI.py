@@ -1,7 +1,6 @@
 import sys
 import evaluator
 import networkx as nx
-import matplotlib.pyplot as plt
 
 from os import listdir
 from xml.dom.minidom import parse
@@ -35,11 +34,11 @@ def analyze(s, parser):
     s = s.replace("%", "")
     if len(s) > 0:
         # parse text (as many times as needed).
-        mytree, = parser.raw_parse(s)   # type: DependencyGraph
+        mytree, = parser.raw_parse(s)  # type: DependencyGraph
         offsets = parser.api_call(s, properties={'annotators': 'tokenize'})['tokens']
         for idx in range(len(offsets)):
-            mytree.nodes[idx+1]['start'] = offsets[idx]['characterOffsetBegin']
-            mytree.nodes[idx+1]['end'] = offsets[idx]['characterOffsetEnd'] - 1
+            mytree.nodes[idx + 1]['start'] = offsets[idx]['characterOffsetBegin']
+            mytree.nodes[idx + 1]['end'] = offsets[idx]['characterOffsetEnd'] - 1
         return mytree
     else:
         print("Empty sentence!")
@@ -47,16 +46,29 @@ def analyze(s, parser):
 
 
 def write_path(analysis, idx_1, idx_2, idx):
-    path1 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1+1, idx)
-    path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2+1, idx)
+    path1 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1, idx)
+    path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx)
     path = analysis.nodes[idx]['word']
-    for i in path1[::-1]:
+    for i in path1[:-1][::-1]:
         path = f"{analysis.nodes[i]['word']} [{analysis.nodes[i]['rel']}] > {path}"
-    for i in path2[::-1]:
+    for i in path2[:-1][::-1]:
         path = f"{path} < [{analysis.nodes[i]['rel']}] {analysis.nodes[i]['word']}"
-    path1,path2=path.split(f"> {analysis.nodes[idx]['word']} <")
-    print(path)
-    return path,path1,path2
+
+    path1, path2 = path.split(f"> {analysis.nodes[idx]['word']} <")
+    # print(path)
+    return path, path1, path2
+
+
+def get_list(lemma, lists):
+    if lemma in lists[0]:
+        return 'effect'
+    elif lemma in lists[1]:
+        return 'mechanism'
+    elif lemma in lists[2]:
+        return 'int'
+    elif lemma in lists[3]:
+        return 'advise'
+    return False
 
 
 def check_interaction(analysis: DependencyGraph, entities, e1, e2):
@@ -75,71 +87,61 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
     offset_2 = entities[e2]
     # Some GT offsets are ""215-226;246-276" because the drug is not consecutive
     if len(offset_1) > 2:
-        offset_1 = [offset_1[0], offset_1[2]]
+        offset_1 = [offset_1[0], offset_1[-1]]
     if len(offset_2) > 2:
-        offset_2 = [offset_2[0], offset_2[2]]
+        offset_2 = [offset_2[0], offset_2[-1]]
 
-    idx_1 = 0
-    idx_2 = 0
+    idx_1 = [0, 10]
+    idx_2 = [0, 10]
 
     for idx in range(1, len(analysis.nodes)):
         for shift in range(0, 10):
-            if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
-                          and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
-                idx_1 = idx
-            if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
-                          and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
-                idx_2 = idx
-        if idx_1 != 0 and idx_2 != 0:
-            break
+            if idx_1[1] > shift and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
+                    and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
+                idx_1 = [idx, shift]
+            if idx_2[1] > shift and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
+                    and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
+                idx_2 = [idx, shift]
 
     # Rules
+    idx_1 = idx_1[0]
+    idx_2 = idx_2[0]
 
-    effects_list = ['administer', 'potentiate', 'prevent','block']
+    effects_list = ['administer', 'potentiate', 'prevent', 'block', 'cause', 'enhance']
     mech_list = ['reduce', 'increase', 'decrease']
     int_list = ['interact', 'interaction']
-    advise_list = ['advise','recommend','caution','consider']
+    advise_list = ['advise', 'recommend', 'caution', 'consider']
 
-    #effect
+    total_list = [effects_list, mech_list, int_list, advise_list]
+
+    # effect
     for idx in range(1, len(analysis.nodes)):
-        if analysis.nodes[idx]['lemma'] in effects_list:
-            try:
-                path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
-                return 'effect'
-            except nx.exception.NetworkXNoPath:
-                continue
-
-    #mechanism
-        if analysis.nodes[idx]['lemma'] in mech_list:
-            try:
-                path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
-                if ('[nsubj]' in path1) & ('[obj]' in path2):
-                    return 'mechanism'
-            except nx.exception.NetworkXNoPath:
-                continue
-
-    #int
-        if analysis.nodes[idx]['lemma'] in int_list:
-            try:
-                path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
-                return 'int'
-            except nx.exception.NetworkXNoPath:
-                continue
-
-    #advise
-        if analysis.nodes[idx]['lemma'] in advise_list:
-            try:
-                path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
-                return 'advise'
-            except nx.exception.NetworkXNoPath:
-                continue
         if analysis.nodes[idx]['lemma'] == 'should':
-            head=analysis.nodes[idx]['head']
             try:
-                path,path1,path2=write_path(analysis,idx_1,idx_2,head)
+                head = analysis.nodes[idx]['head']
+                write_path(analysis, idx_1, idx_2, head)
                 return 'advise'
             except nx.exception.NetworkXNoPath:
                 continue
+
+    for idx in range(1, len(analysis.nodes)):
+        lemma_list = get_list(analysis.nodes[idx]['lemma'], total_list)
+        try:
+            if lemma_list:
+                path, path1, path2 = write_path(analysis, idx_1, idx_2, idx)
+                if ('[nsubj]' in path1) & ('[obj]' in path2):
+                    return lemma_list
+        except nx.exception.NetworkXNoPath:
+            continue
+
+    for idx in range(1, len(analysis.nodes)):
+        lemma_list = get_list(analysis.nodes[idx]['lemma'], total_list)
+        try:
+            if lemma_list:
+                write_path(analysis, idx_1, idx_2, idx)
+                return lemma_list
+        except nx.exception.NetworkXNoPath:
+            continue
 
     return None
 
@@ -162,6 +164,7 @@ if __name__ == '__main__':
         sentences = tree.getElementsByTagName("sentence")
         for s in sentences:
             sid = s.attributes["id"].value  # get sentence id
+
             stext = s.attributes["text"].value  # get sentence text
 
             # load sentence entities into dictionary
@@ -186,3 +189,46 @@ if __name__ == '__main__':
     outf.close()
     # get performance score
     evaluator.evaluate("DDI", inputdir, outputfile)
+
+# if __name__ == '__main__':
+#     inputdir = 'data/train'
+#     label = 'mechanism'
+#
+#     # connect to your CoreNLP server (just once)
+#     my_parser = CoreNLPDependencyParser(url="http://localhost:9000")
+#
+#     # process each file in directory
+#     for idx, f in enumerate(listdir(inputdir), 1):
+#         print(f"Processing file nº {idx}/{len(listdir(inputdir))}")
+#
+#         # parse XML file, obtaining a DOM tree
+#         tree = parse(inputdir + "/" + f)
+#         print(f)
+#         # process each sentence in the file
+#         sentences = tree.getElementsByTagName("sentence")
+#         for s in sentences:
+#             sid = s.attributes["id"].value  # get sentence id
+#             stext = s.attributes["text"].value  # get sentence text
+#
+#             # load sentence entities into dictionary
+#             entities = {}
+#             ents = s.getElementsByTagName("entity")
+#             for e in ents:
+#                 eid = e.attributes["id"].value
+#                 entities[eid] = e.attributes["charOffset"].value.split("-")
+#
+#             # Tokenize, tag, and parse sentence
+#             analysis = analyze(stext, my_parser)
+#
+#             # for each pair in the sentence, decide whether it is DDI and its type
+#             pairs = s.getElementsByTagName("pair")
+#             for p in pairs:
+#                 try:
+#                     if p.attributes["type"].value == label:
+#                         print(stext)
+#                         id_e1 = p.attributes["e1"].value
+#                         id_e2 = p.attributes["e2"].value
+#                         ddi_type = check_interaction(analysis, entities, id_e1, id_e2)
+#                         break
+#                 except KeyError:
+#                     continue
