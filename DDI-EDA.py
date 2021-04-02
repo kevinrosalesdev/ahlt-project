@@ -47,8 +47,8 @@ def analyze(s, parser):
 
 
 def write_path(analysis, idx_1, idx_2, idx):
-    path1 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1+1, idx)
-    path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2+1, idx)
+    path1 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1 +1, idx)
+    path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2 +1, idx)
     path = analysis.nodes[idx]['word']
     for i in path1[::-1]:
         path = f"{analysis.nodes[i]['word']} [{analysis.nodes[i]['rel']}] > {path}"
@@ -84,21 +84,18 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
 
     for idx in range(1, len(analysis.nodes)):
         for shift in range(0, 10):
-            try:
-                if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
-                              and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
-                    idx_1 = idx
-                if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
-                              and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
-                    idx_2 = idx
-            except ValueError:
-                continue
+            if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
+                idx_1 = idx
+            if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
+                idx_2 = idx
         if idx_1 != 0 and idx_2 != 0:
             break
 
     # Rules
 
-    effects_list = ['administer', 'potentiate', 'prevent','block']
+    effects_list = ['administer', 'potentiate', 'prevent']
     mech_list = ['reduce', 'increase', 'decrease']
     int_list = ['interact', 'interaction']
 
@@ -106,6 +103,7 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
         if analysis.nodes[idx]['lemma'] in effects_list:
             try:
                 path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
+
                 return 'effect'
             except nx.exception.NetworkXNoPath:
                 continue
@@ -131,9 +129,8 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
 
 
 if __name__ == '__main__':
-    inputdir = sys.argv[1]
-    outputfile = sys.argv[2]
-    outf = open(outputfile, "w")
+    inputdir = 'data/train'
+    label='effect'
 
     # connect to your CoreNLP server (just once)
     my_parser = CoreNLPDependencyParser(url="http://localhost:9000")
@@ -163,12 +160,39 @@ if __name__ == '__main__':
             # for each pair in the sentence, decide whether it is DDI and its type
             pairs = s.getElementsByTagName("pair")
             for p in pairs:
-                id_e1 = p.attributes["e1"].value
-                id_e2 = p.attributes["e2"].value
-                ddi_type = check_interaction(analysis, entities, id_e1, id_e2)
-                if ddi_type is not None:
-                    print(sid + "|" + id_e1 + "|" + id_e2 + "|" + ddi_type, file=outf)
+                try:
+                    if p.attributes["type"].value==label:
+                        print(stext)
+                        id_e1 = p.attributes["e1"].value
+                        id_e2 = p.attributes["e2"].value
+                        ddi_type = check_interaction(analysis, entities, id_e1, id_e2)
+                        break
+                except KeyError:
+                    continue
 
-    outf.close()
-    # get performance score
-    evaluator.evaluate("DDI", inputdir, outputfile)
+
+# inputdir = 'data/train'
+# label='effect'
+#
+# # process each file in directory
+# for idx, f in enumerate(listdir(inputdir), 1):
+#
+#     # parse XML file, obtaining a DOM tree
+#     tree = parse(inputdir + "/" + f)
+#     # process each sentence in the file
+#     sentences = tree.getElementsByTagName("sentence")
+#     for s in sentences:
+#         sid = s.attributes["id"].value  # get sentence id
+#         stext = s.attributes["text"].value  # get sentence text
+#
+#
+#         # for each pair in the sentence, decide whether it is DDI and its type
+#         pairs = s.getElementsByTagName("pair")
+#         for pair in pairs:
+#             try:
+#                 if pair.attributes["type"].value==label:
+#                     print(stext)
+#                     break
+#             except KeyError:
+#                 continue
+
