@@ -84,15 +84,12 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
 
     for idx in range(1, len(analysis.nodes)):
         for shift in range(0, 10):
-            try:
-                if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
-                              and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
-                    idx_1 = idx
-                if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
-                              and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
-                    idx_2 = idx
-            except ValueError:
-                continue
+            if idx_1 == 0 and analysis.nodes[idx]['start'] >= int(offset_1[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_1[1]) + shift:
+                idx_1 = idx
+            if idx_2 == 0 and analysis.nodes[idx]['start'] >= int(offset_2[0]) - shift \
+                          and analysis.nodes[idx]['end'] <= int(offset_2[1]) + shift:
+                idx_2 = idx
         if idx_1 != 0 and idx_2 != 0:
             break
 
@@ -101,7 +98,9 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
     effects_list = ['administer', 'potentiate', 'prevent','block']
     mech_list = ['reduce', 'increase', 'decrease']
     int_list = ['interact', 'interaction']
+    advise_list = ['advise','recommend','caution','consider']
 
+    #effect
     for idx in range(1, len(analysis.nodes)):
         if analysis.nodes[idx]['lemma'] in effects_list:
             try:
@@ -110,6 +109,7 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
             except nx.exception.NetworkXNoPath:
                 continue
 
+    #mechanism
         if analysis.nodes[idx]['lemma'] in mech_list:
             try:
                 path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
@@ -118,6 +118,7 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
             except nx.exception.NetworkXNoPath:
                 continue
 
+    #int
         if analysis.nodes[idx]['lemma'] in int_list:
             try:
                 path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
@@ -125,7 +126,20 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
             except nx.exception.NetworkXNoPath:
                 continue
 
-
+    #advise
+        if analysis.nodes[idx]['lemma'] in advise_list:
+            try:
+                path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
+                return 'advise'
+            except nx.exception.NetworkXNoPath:
+                continue
+        if analysis.nodes[idx]['lemma'] == 'should':
+            head=analysis.nodes[idx]['head']
+            try:
+                path,path1,path2=write_path(analysis,idx_1,idx_2,head)
+                return 'advise'
+            except nx.exception.NetworkXNoPath:
+                continue
 
     return None
 

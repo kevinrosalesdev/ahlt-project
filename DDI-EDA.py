@@ -111,8 +111,8 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
         if analysis.nodes[idx]['lemma'] in mech_list:
             try:
                 path,path1,path2=write_path(analysis,idx_1,idx_2,idx)
-                if ('[nsubj]' in path1) & ('[obj]' in path2):
-                    return 'mechanism'
+                #if ('[nsubj]' in path1) & ('[obj]' in path2):
+                return 'mechanism'
             except nx.exception.NetworkXNoPath:
                 continue
 
@@ -130,7 +130,7 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
 
 if __name__ == '__main__':
     inputdir = 'data/train'
-    label='effect'
+    label='advise'
 
     # connect to your CoreNLP server (just once)
     my_parser = CoreNLPDependencyParser(url="http://localhost:9000")
