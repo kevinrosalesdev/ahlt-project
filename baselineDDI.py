@@ -32,7 +32,7 @@ def analyze(s, parser):
 
     # '%' is a reserved token for CoreNLP
     # '\r\n': Symbols found in training set that do not allow CoreNLP to correctly process the sentence.
-    s = s.replace("%", "").replace("\r\n", ". ")
+    s = s.replace("%", "%25").replace("+", "%2B").replace("\r\n", ". ")
     if len(s) > 0:
         # parse text (as many times as needed).
         mytree, = parser.raw_parse(s)  # type: DependencyGraph

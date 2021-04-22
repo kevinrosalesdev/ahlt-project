@@ -1,7 +1,7 @@
 |        Ruizhe         |         Kevin          |
 | :-------------------: | :--------------------: |
-| `extract_features(s)` | `get_tag(token, gold)` |
-|     `learner.py`      |    `classifier.py`     |
+| Learner & Classifier | `extract_features` |
 
-- Saturday/Sunday.
-- From Sunday to Thursday: improve initial pipeline & include ER utilization. Maybe try other classifier systems.
+- 1st Week: Complete pipeline for ML-Based Approach.
+- 2nd Week: Improve ML-Based & Rule-Based Approach.
+- 3rd Week: Report.
