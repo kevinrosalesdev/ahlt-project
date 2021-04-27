@@ -1,4 +1,5 @@
 import sys
+import networkx as nx
 
 from os import listdir
 from xml.dom.minidom import parse
@@ -44,7 +45,103 @@ def analyze(s, parser):
         return {}
 
 
-def extract_features(tree, entities, e1, e2):
+def get_entity_idx(tree: DependencyGraph, entities, e):
+    offset = entities[e]
+
+    # Some GT offsets are ""215-226;246-276" because the drug is not consecutive
+    if len(offset) > 2:
+        offset = [offset[0], offset[-1]]
+
+    idx_e = [0, 10]
+
+    for idx in range(1, len(tree.nodes)):
+        for shift in range(0, 10):
+            if idx_e[1] > shift and tree.nodes[idx]['start'] >= int(offset[0]) - shift \
+                    and tree.nodes[idx]['end'] <= int(offset[1]) + shift:
+                idx_e = [idx, shift]
+
+    # Rules
+    return idx_e[0]
+
+
+def write_direct_path(analysis, idx_1, idx_2, mode='default'):
+    """
+    :param mode:
+        - 'default': Slides 21-23 (e.g. path=conj<dobj<combine>nmod)
+        - 'entities': Slide 24 (e.g. path=conj<ENTITY/dobj<combine>nmod)
+        - 'summary': Slide 25 (e.g. path=dobj*<combine>nmod)
+    """
+    if mode == 'entities':
+        entities_idx = [get_entity_idx(analysis, entities, e) for e in list(entities.keys())]
+
+    try:
+        direct_path = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1, idx_2)[:-1][::-1]
+        if mode == 'summary' and len(direct_path) > 1:
+            return f"{analysis.nodes[direct_path[0]]['rel']}*"
+        path = ''
+        for i in direct_path:
+            if mode == 'entities' and i in entities_idx:
+                path = f"ENTITY/{analysis.nodes[i]['rel']}<{path}"
+            else:
+                path = f"{analysis.nodes[i]['rel']}<{path}"
+        return path[:-1]
+    except nx.exception.NetworkXNoPath:
+        pass
+
+    try:
+        direct_path = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx_1)[:-1][::-1]
+        if mode == 'summary' and len(direct_path) > 1:
+            return f"{analysis.nodes[direct_path[0]]['rel']}*"
+        path = ''
+        for i in direct_path:
+            if mode == 'entities' and i in entities_idx:
+                path = f"{path}>ENTITY/{analysis.nodes[i]['rel']}"
+            else:
+                path = f"{path}>{analysis.nodes[i]['rel']}"
+        return path[1:]
+    except nx.exception.NetworkXNoPath:
+        pass
+
+    return None
+
+
+def write_path(analysis, idx_1, idx_2, idx, entities, mode='default'):
+    """
+    :param mode:
+        - 'default': Slides 21-23 (e.g. path=conj<dobj<combine>nmod)
+        - 'entities': Slide 24 (e.g. path=conj<ENTITY/dobj<combine>nmod)
+        - 'summary': Slide 25 (e.g. path=dobj*<combine>nmod)
+    """
+    if mode == 'entities':
+        entities_idx = [get_entity_idx(analysis, entities, e) for e in list(entities.keys())]
+
+    try:
+        path1 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1, idx)[:-1][::-1]
+        path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx)[:-1][::-1]
+    except nx.exception.NetworkXNoPath:
+        return None
+    path = analysis.nodes[idx]['lemma']
+    for i in path1:
+        if mode == 'summary' and len(path1) > 1:
+            path = f"{analysis.nodes[path1[0]]['rel']}*<{path}"
+            break
+        if mode == 'entities' and i in entities_idx:
+            path = f"ENTITY/{analysis.nodes[i]['rel']}<{path}"
+        else:
+            path = f"{analysis.nodes[i]['rel']}<{path}"
+    for i in path2:
+        if mode == 'summary' and len(path2) > 1:
+            path = f"{path}>{analysis.nodes[path2[0]]['rel']}*"
+            break
+        if mode == 'entities' and i in entities_idx:
+            path = f"{path}>ENTITY/{analysis.nodes[i]['rel']}"
+        else:
+            path = f"{path}>{analysis.nodes[i]['rel']}"
+
+    return path
+
+
+def extract_features(tree: DependencyGraph, entities, e1, e2):
     """
     Task:
         Given an analyzed sentence and two target entities, compute a feature
@@ -66,7 +163,20 @@ def extract_features(tree, entities, e1, e2):
            ’lib=acid’,’lib=with’,’LCSpos=VBG’,’LCSlema=combine’,
             ’path=dobj/combine\nmod\compound’ ’entity_in_between’]
     """
-    return []
+    idx_1 = get_entity_idx(tree, entities, e1)
+    idx_2 = get_entity_idx(tree, entities, e2)
+
+    feature_list = []
+    direct_path = write_direct_path(tree, idx_1, idx_2, mode="default")
+    if direct_path is not None:
+        feature_list.append(f'dir_path={direct_path}')
+    for idx in range(1, len(analysis.nodes)):
+        if analysis.nodes[idx]['tag'] in ['VB', 'VBN', 'VBZ', 'VBG']:
+            path = write_path(tree, idx_1, idx_2, idx, entities, mode="default")
+            if path is not None:
+                feature_list.append(f'path={path}')
+
+    return feature_list
 
 
 if __name__ == '__main__':
