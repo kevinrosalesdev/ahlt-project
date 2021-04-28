@@ -3,6 +3,8 @@ import networkx as nx
 
 from os import listdir
 from xml.dom.minidom import parse
+
+import numpy as np
 from nltk.parse.corenlp import CoreNLPDependencyParser
 from nltk.parse.corenlp import DependencyGraph
 
@@ -67,9 +69,9 @@ def get_entity_idx(tree: DependencyGraph, entities, e):
 def write_direct_path(analysis, idx_1, idx_2, mode='default'):
     """
     :param mode:
-        - 'default': Slides 21-23 (e.g. path=conj<dobj<combine>nmod)
-        - 'entities': Slide 24 (e.g. path=conj<ENTITY/dobj<combine>nmod)
-        - 'summary': Slide 25 (e.g. path=dobj*<combine>nmod)
+        - 'default': Slides 21-23 (e.g. path=conj<dobj)
+        - 'entities': Slide 24 (e.g. path=conj<ENTITY/dobj)
+        - 'summary': Slide 25 (e.g. path=dobj*)
     """
     if mode == 'entities':
         entities_idx = [get_entity_idx(analysis, entities, e) for e in list(entities.keys())]
@@ -77,28 +79,28 @@ def write_direct_path(analysis, idx_1, idx_2, mode='default'):
     try:
         direct_path = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_1, idx_2)[:-1][::-1]
         if mode == 'summary' and len(direct_path) > 1:
-            return f"{analysis.nodes[direct_path[0]]['rel']}*"
+            return f"{analysis.nodes[direct_path[0]]['rel']}*<"
         path = ''
         for i in direct_path:
             if mode == 'entities' and i in entities_idx:
                 path = f"ENTITY/{analysis.nodes[i]['rel']}<{path}"
             else:
                 path = f"{analysis.nodes[i]['rel']}<{path}"
-        return path[:-1]
+        return path
     except nx.exception.NetworkXNoPath:
         pass
 
     try:
         direct_path = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx_1)[:-1][::-1]
         if mode == 'summary' and len(direct_path) > 1:
-            return f"{analysis.nodes[direct_path[0]]['rel']}*"
+            return f">{analysis.nodes[direct_path[0]]['rel']}*"
         path = ''
         for i in direct_path:
             if mode == 'entities' and i in entities_idx:
                 path = f"{path}>ENTITY/{analysis.nodes[i]['rel']}"
             else:
                 path = f"{path}>{analysis.nodes[i]['rel']}"
-        return path[1:]
+        return path
     except nx.exception.NetworkXNoPath:
         pass
 
@@ -141,7 +143,7 @@ def write_path(analysis, idx_1, idx_2, idx, entities, mode='default'):
     return path
 
 
-def extract_features(tree: DependencyGraph, entities, e1, e2):
+def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
     """
     Task:
         Given an analyzed sentence and two target entities, compute a feature
@@ -167,14 +169,67 @@ def extract_features(tree: DependencyGraph, entities, e1, e2):
     idx_2 = get_entity_idx(tree, entities, e2)
 
     feature_list = []
-    direct_path = write_direct_path(tree, idx_1, idx_2, mode="default")
+    open_class = ['JJ', 'JJR', 'JJS'
+                  'NN', 'NNS', 'NNP', 'NNPS',
+                  'RB', 'RBR', 'RBS',
+                  'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+
+    for idx in range(1, idx_1):
+        if tree.nodes[idx]['tag'] in open_class:
+            feature_list.append(f"lb1={tree.nodes[idx]['lemma']}")
+
+    for idx in range(idx_1+1, idx_2):
+        if tree.nodes[idx]['tag'] in open_class:
+            feature_list.append(f"lib={tree.nodes[idx]['lemma']}")
+
+    for idx in range(idx_2+1, len(tree.nodes)):
+        if tree.nodes[idx]['tag'] in open_class:
+            feature_list.append(f"la2={tree.nodes[idx]['lemma']}")
+
+    entity_in_between = False
+    offset_1 = entities[e1]
+    offset_2 = entities[e2]
+    for entity in entities.keys():
+        offset_3 = entities[entity]
+        if entity != e1 and entity != e2 and int(offset_3[0]) > int(offset_1[-1]) and int(offset_3[-1]) < int(offset_2[0]):
+            entity_in_between = True
+            break
+
+    if entity_in_between:
+        feature_list.append('entity_in_between')
+
+    direct_path = write_direct_path(tree, idx_1, idx_2, mode=mode)
     if direct_path is not None:
-        feature_list.append(f'dir_path={direct_path}')
-    for idx in range(1, len(analysis.nodes)):
-        if analysis.nodes[idx]['tag'] in ['VB', 'VBN', 'VBZ', 'VBG']:
-            path = write_path(tree, idx_1, idx_2, idx, entities, mode="default")
-            if path is not None:
-                feature_list.append(f'path={path}')
+        feature_list.append(f'path={direct_path}')
+    else:
+        effects_list = ['administer', 'potentiate', 'prevent', 'block', 'cause', 'enhance', 'result', 'associate']
+        mech_list = ['reduce', 'increase', 'decrease']
+        int_list = ['interact', 'interaction']
+        advise_list = ['advise', 'recommend', 'caution', 'consider']
+        total_list = [effects_list, mech_list, int_list, advise_list]
+
+        lcs = np.Inf
+        lcs_path = None
+        verb_info = [None, None, None]
+        for idx in range(1, len(tree.nodes)):
+            # It only returns the path containing the LCS Verb!!
+            if tree.nodes[idx]['tag'] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+                path = write_path(tree, idx_1, idx_2, idx, entities, mode=mode)
+                if path is not None and path.count("<") + path.count(">") < lcs:
+                    lcs_path = path
+                    lcs = path.count("<") + path.count(">")
+                    search_list = [i for i in range(len(total_list)) if tree.nodes[idx]['lemma'] in total_list[i]]
+                    verb_info = [tree.nodes[idx]['tag'], tree.nodes[idx]['lemma'],
+                                 search_list[0] if len(search_list) != 0 else None]
+
+        if lcs_path is not None:
+            feature_list.append(f'path={lcs_path}')
+            feature_list.append(f'LCSpos={verb_info[0]}')
+            feature_list.append(f'LCSlemma={verb_info[1]}')
+            if verb_info[2] is not None:
+                type_list = ['effect', 'mech', 'int', 'advise']
+                feature_list.append(f'LCSlist={type_list[verb_info[2]]}')
+
 
     return feature_list
 
@@ -187,7 +242,7 @@ if __name__ == '__main__':
 
     # process each file in directory
     for idx, f in enumerate(listdir(inputdir), 1):
-        print(f"Processing file nº {idx}/{len(listdir(inputdir))}")
+        # print(f"Processing file nº {idx}/{len(listdir(inputdir))}")
 
         # parse XML file, obtaining a DOM tree
         tree = parse(inputdir + "/" + f)
@@ -220,5 +275,5 @@ if __name__ == '__main__':
                 id_e2 = p.attributes["e2"].value
 
                 # feature extraction
-                feats = extract_features(analysis, entities, id_e1, id_e2)
+                feats = extract_features(analysis, entities, id_e1, id_e2, mode='default')
                 print(sid, id_e1, id_e2, dditype, '\t'.join(feats), sep="\t")
