@@ -62,7 +62,6 @@ def get_entity_idx(tree: DependencyGraph, entities, e):
                     and tree.nodes[idx]['end'] <= int(offset[1]) + shift:
                 idx_e = [idx, shift]
 
-    # Rules
     return idx_e[0]
 
 
@@ -275,5 +274,5 @@ if __name__ == '__main__':
                 id_e2 = p.attributes["e2"].value
 
                 # feature extraction
-                feats = extract_features(analysis, entities, id_e1, id_e2, mode='default')
+                feats = extract_features(analysis, entities, id_e1, id_e2, mode='entities')
                 print(sid, id_e1, id_e2, dditype, '\t'.join(feats), sep="\t")
