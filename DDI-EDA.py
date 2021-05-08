@@ -181,7 +181,7 @@ def check_interaction(analysis: DependencyGraph, entities, e1, e2):
 
 if __name__ == '__main__':
     inputdir = 'data/train'
-    label = 'int'
+    label = 'mechanism'
 
     # connect to your CoreNLP server (just once)
     my_parser = CoreNLPDependencyParser(url="http://localhost:9000")

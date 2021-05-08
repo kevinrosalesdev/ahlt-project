@@ -121,7 +121,10 @@ def write_path(analysis, idx_1, idx_2, idx, entities, mode='default'):
         path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx)[:-1][::-1]
     except nx.exception.NetworkXNoPath:
         return None
-    path = analysis.nodes[idx]['lemma']
+    if mode !='summary':
+        path = analysis.nodes[idx]['lemma']
+    else:
+        path=''
     for i in path1:
         if mode == 'summary' and len(path1) > 1:
             path = f"{analysis.nodes[path1[0]]['rel']}*<{path}"
@@ -169,7 +172,7 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
 
     feature_list = []
     open_class = ['JJ', 'JJR', 'JJS'
-                  'NN', 'NNS', 'NNP', 'NNPS',
+                               'NN', 'NNS', 'NNP', 'NNPS',
                   'RB', 'RBR', 'RBS',
                   'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
 
@@ -177,11 +180,11 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
         if tree.nodes[idx]['tag'] in open_class:
             feature_list.append(f"lb1={tree.nodes[idx]['lemma']}")
 
-    for idx in range(idx_1+1, idx_2):
+    for idx in range(idx_1 + 1, idx_2):
         if tree.nodes[idx]['tag'] in open_class:
             feature_list.append(f"lib={tree.nodes[idx]['lemma']}")
 
-    for idx in range(idx_2+1, len(tree.nodes)):
+    for idx in range(idx_2 + 1, len(tree.nodes)):
         if tree.nodes[idx]['tag'] in open_class:
             feature_list.append(f"la2={tree.nodes[idx]['lemma']}")
 
@@ -190,7 +193,8 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
     offset_2 = entities[e2]
     for entity in entities.keys():
         offset_3 = entities[entity]
-        if entity != e1 and entity != e2 and int(offset_3[0]) > int(offset_1[-1]) and int(offset_3[-1]) < int(offset_2[0]):
+        if entity != e1 and entity != e2 and int(offset_3[0]) > int(offset_1[-1]) and int(offset_3[-1]) < int(
+                offset_2[0]):
             entity_in_between = True
             break
 
@@ -209,32 +213,53 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
 
         lcs = np.Inf
         lcs_path = None
-        verb_info = [None, None, None]
+        # verb_info = [None, None, None]
         for idx in range(1, len(tree.nodes)):
             # It only returns the path containing the LCS Verb!!
             if tree.nodes[idx]['tag'] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
                 path = write_path(tree, idx_1, idx_2, idx, entities, mode=mode)
+                should = False
+                try:
+                    auxiliaries=tree.nodes[idx]['deps']['aux']
+                    for node in auxiliaries:
+                        if tree.nodes[node]['lemma'].lower()=='should':
+                            should=True
+                            break
+                except KeyError:
+                    pass
+                search_list = [i for i in range(len(total_list)) if tree.nodes[idx]['lemma'] in total_list[i]]
                 if path is not None and path.count("<") + path.count(">") < lcs:
                     lcs_path = path
                     lcs = path.count("<") + path.count(">")
-                    search_list = [i for i in range(len(total_list)) if tree.nodes[idx]['lemma'] in total_list[i]]
                     verb_info = [tree.nodes[idx]['tag'], tree.nodes[idx]['lemma'],
-                                 search_list[0] if len(search_list) != 0 else None]
+                                 search_list[0] if len(search_list) != 0 else None,should,path]
+                elif path is not None:
+                    feature_list.append(f'path={path}')
+                    feature_list.append(f"pos={tree.nodes[idx]['tag']}")
+                    feature_list.append(f"lemma={tree.nodes[idx]['lemma']}")
+                    search=search_list[0] if len(search_list) != 0 else None
+                    if search is not None:
+                        type_list = ['effect', 'mech', 'int', 'advise']
+                        feature_list.append(f'list={type_list[search]}')
+                    if should:
+                        feature_list.append(f'should')
 
         if lcs_path is not None:
-            feature_list.append(f'path={lcs_path}')
+            feature_list.append(f'LCSpath={lcs_path}')
             feature_list.append(f'LCSpos={verb_info[0]}')
             feature_list.append(f'LCSlemma={verb_info[1]}')
             if verb_info[2] is not None:
                 type_list = ['effect', 'mech', 'int', 'advise']
                 feature_list.append(f'LCSlist={type_list[verb_info[2]]}')
-
+            if verb_info[3]:
+                feature_list.append(f'LCSshould')
 
     return feature_list
 
 
 if __name__ == '__main__':
     inputdir = sys.argv[1]
+    mode = sys.argv[2]
 
     # connect to your CoreNLP server (just once)
     my_parser = CoreNLPDependencyParser(url="http://localhost:9000")
@@ -274,5 +299,58 @@ if __name__ == '__main__':
                 id_e2 = p.attributes["e2"].value
 
                 # feature extraction
-                feats = extract_features(analysis, entities, id_e1, id_e2, mode='entities')
+                feats = extract_features(analysis, entities, id_e1, id_e2, mode=mode)
                 print(sid, id_e1, id_e2, dditype, '\t'.join(feats), sep="\t")
+
+#should+paths
+#                 tp     fp      fn    #pred   #exp    P       R       F1
+# ------------------------------------------------------------------------------
+# advise             82     62      56     144     138    56.9%   59.4%   58.2%
+# effect            126     78     189     204     315    61.8%   40.0%   48.6%
+# int                16      2      19      18      35    88.9%   45.7%   60.4%
+# mechanism         101     79     163     180     264    56.1%   38.3%   45.5%
+# ------------------------------------------------------------------------------
+# M.avg            -      -       -       -       -       65.9%   45.8%   53.1%
+# ------------------------------------------------------------------------------
+# m.avg             325    221     427     546     752    59.5%   43.2%   50.1%
+# m.avg(no class)   352    194     400     546     752    64.5%   46.8%   54.2%
+
+#should
+#                 tp     fp      fn    #pred   #exp    P       R       F1
+# ------------------------------------------------------------------------------
+# advise             76     62      62     138     138    55.1%   55.1%   55.1%
+# effect            123     75     192     198     315    62.1%   39.0%   48.0%
+# int                16      2      19      18      35    88.9%   45.7%   60.4%
+# mechanism          97     86     167     183     264    53.0%   36.7%   43.4%
+# ------------------------------------------------------------------------------
+# M.avg            -      -       -       -       -       64.8%   44.1%   51.7%
+# ------------------------------------------------------------------------------
+# m.avg             312    225     440     537     752    58.1%   41.5%   48.4%
+# m.avg(no class)   343    194     409     537     752    63.9%   45.6%   53.2%
+
+#path
+#                 tp     fp      fn    #pred   #exp    P       R       F1
+# ------------------------------------------------------------------------------
+# advise             76     62      62     138     138    55.1%   55.1%   55.1%
+# effect            123     75     192     198     315    62.1%   39.0%   48.0%
+# int                16      2      19      18      35    88.9%   45.7%   60.4%
+# mechanism          97     86     167     183     264    53.0%   36.7%   43.4%
+# ------------------------------------------------------------------------------
+# M.avg            -      -       -       -       -       64.8%   44.1%   51.7%
+# ------------------------------------------------------------------------------
+# m.avg             312    225     440     537     752    58.1%   41.5%   48.4%
+# m.avg(no class)   343    194     409     537     752    63.9%   45.6%   53.2%
+
+#None
+#                 tp     fp      fn    #pred   #exp    P       R       F1
+# ------------------------------------------------------------------------------
+# advise             73     59      65     132     138    55.3%   52.9%   54.1%
+# effect            128     68     187     196     315    65.3%   40.6%   50.1%
+# int                16      2      19      18      35    88.9%   45.7%   60.4%
+# mechanism          98     76     166     174     264    56.3%   37.1%   44.7%
+# ------------------------------------------------------------------------------
+# M.avg            -      -       -       -       -       66.5%   44.1%   52.3%
+# ------------------------------------------------------------------------------
+# m.avg             315    205     437     520     752    60.6%   41.9%   49.5%
+# m.avg(no class)   346    174     406     520     752    66.5%   46.0%   54.4%
+
