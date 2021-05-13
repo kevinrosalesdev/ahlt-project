@@ -1,7 +1,3 @@
-|        Ruizhe         |         Kevin          |
-| :-------------------: | :--------------------: |
-| Learner & Classifier | `extract_features` |
-
-- 1st Week: Complete pipeline for ML-Based Approach.
-- 2nd Week: Improve ML-Based & Rule-Based Approach.
-- 3rd Week: Report.
+- 1st Week [13-20]: NERC Task.
+- 2nd Week [20-27]: Optimize NERC & DDI Task.
+- 3rd Week [27-06]: Optimize DDI & Report.

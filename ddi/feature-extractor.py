@@ -121,10 +121,10 @@ def write_path(analysis, idx_1, idx_2, idx, entities, mode='default'):
         path2 = nx.astar_path(nx.DiGraph(analysis.nx_graph()), idx_2, idx)[:-1][::-1]
     except nx.exception.NetworkXNoPath:
         return None
-    if mode !='summary':
+    if mode != 'summary':
         path = analysis.nodes[idx]['lemma']
     else:
-        path=''
+        path = ''
     for i in path1:
         if mode == 'summary' and len(path1) > 1:
             path = f"{analysis.nodes[path1[0]]['rel']}*<{path}"
@@ -220,10 +220,10 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
                 path = write_path(tree, idx_1, idx_2, idx, entities, mode=mode)
                 should = False
                 try:
-                    auxiliaries=tree.nodes[idx]['deps']['aux']
+                    auxiliaries = tree.nodes[idx]['deps']['aux']
                     for node in auxiliaries:
-                        if tree.nodes[node]['lemma'].lower()=='should':
-                            should=True
+                        if tree.nodes[node]['lemma'].lower() == 'should':
+                            should = True
                             break
                 except KeyError:
                     pass
@@ -232,12 +232,13 @@ def extract_features(tree: DependencyGraph, entities, e1, e2, mode='default'):
                     lcs_path = path
                     lcs = path.count("<") + path.count(">")
                     verb_info = [tree.nodes[idx]['tag'], tree.nodes[idx]['lemma'],
-                                 search_list[0] if len(search_list) != 0 else None,should,path]
+                                 search_list[0] if len(search_list) != 0 else None,
+                                 should, path]
                 elif path is not None:
                     feature_list.append(f'path={path}')
                     feature_list.append(f"pos={tree.nodes[idx]['tag']}")
                     feature_list.append(f"lemma={tree.nodes[idx]['lemma']}")
-                    search=search_list[0] if len(search_list) != 0 else None
+                    search = search_list[0] if len(search_list) != 0 else None
                     if search is not None:
                         type_list = ['effect', 'mech', 'int', 'advise']
                         feature_list.append(f'list={type_list[search]}')
@@ -302,7 +303,7 @@ if __name__ == '__main__':
                 feats = extract_features(analysis, entities, id_e1, id_e2, mode=mode)
                 print(sid, id_e1, id_e2, dditype, '\t'.join(feats), sep="\t")
 
-#should+paths
+# should+paths
 #                 tp     fp      fn    #pred   #exp    P       R       F1
 # ------------------------------------------------------------------------------
 # advise             82     62      56     144     138    56.9%   59.4%   58.2%
@@ -315,7 +316,7 @@ if __name__ == '__main__':
 # m.avg             325    221     427     546     752    59.5%   43.2%   50.1%
 # m.avg(no class)   352    194     400     546     752    64.5%   46.8%   54.2%
 
-#should
+# should
 #                 tp     fp      fn    #pred   #exp    P       R       F1
 # ------------------------------------------------------------------------------
 # advise             76     62      62     138     138    55.1%   55.1%   55.1%
@@ -328,7 +329,7 @@ if __name__ == '__main__':
 # m.avg             312    225     440     537     752    58.1%   41.5%   48.4%
 # m.avg(no class)   343    194     409     537     752    63.9%   45.6%   53.2%
 
-#path
+# path
 #                 tp     fp      fn    #pred   #exp    P       R       F1
 # ------------------------------------------------------------------------------
 # advise             76     62      62     138     138    55.1%   55.1%   55.1%
@@ -341,7 +342,7 @@ if __name__ == '__main__':
 # m.avg             312    225     440     537     752    58.1%   41.5%   48.4%
 # m.avg(no class)   343    194     409     537     752    63.9%   45.6%   53.2%
 
-#None
+# None
 #                 tp     fp      fn    #pred   #exp    P       R       F1
 # ------------------------------------------------------------------------------
 # advise             73     59      65     132     138    55.3%   52.9%   54.1%
@@ -353,4 +354,3 @@ if __name__ == '__main__':
 # ------------------------------------------------------------------------------
 # m.avg             315    205     437     520     752    60.6%   41.9%   49.5%
 # m.avg(no class)   346    174     406     520     752    66.5%   46.0%   54.4%
-
