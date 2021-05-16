@@ -3,6 +3,7 @@ from nerc.feature_extractor import *
 from sklearn.preprocessing import MultiLabelBinarizer, LabelBinarizer
 from itertools import chain
 
+
 def load_data(path, features=False):  # Ruizhe
     if features:
         x, y, sids, infos = read_features(path)
@@ -45,14 +46,35 @@ def load_data(path, features=False):  # Ruizhe
 
 
 def create_indexs(x, y, max_length):  # Ruizhe
-    mlb = MultiLabelBinarizer()
-    mlb.fit([['<PAD>']]+list(chain(*x)))
+    feats_aux = {}
+    feats = {}
+
+    for f in set(chain(*chain(*x))):
+        try:
+            name, value = f.split('=')
+        except ValueError:
+            pass #for now I ignore true or false features
+        try:
+            feats_aux[name].add(value)
+        except KeyError:
+            feats_aux[name] = set(value)
+    for name in feats_aux.keys():
+        feats[name] = {}
+        for i, value in enumerate(feats_aux[name]):
+            feats[name][value] = i+2
     lb = LabelBinarizer()
-    lb.fit(['<PAD>']+list(chain(*y)))
-    return {'feats': mlb,
-            'labels': lb,
-            'max_length': max_length
-            }
+    lb.fit(list(chain(*y)))
+
+    idx = {'feats': feats,
+           'labels': {l: i + 2 for i, l in enumerate(lb.classes_)},
+           'max_length': max_length
+           }
+    for key in idx['feats'].keys():
+        idx['feats'][key]['<PAD>'] = 0
+        idx['feats'][key]['<UNK>'] = 1
+    idx['labels']['<PAD>'] = 0
+    idx['labels']['<UNK>'] = 1
+    return idx
 
 
 def build_network():  # Kevin
@@ -60,30 +82,55 @@ def build_network():  # Kevin
 
 
 def encode_words(x, idx):  # Ruizhe
-    max_length=idx['max_length']
-    feats_mlb=idx['feats']
-    X=[]
+    max_length = idx['max_length']
+    feats = idx['feats']
+    X = {key:[] for key in feats.keys()}
     for sentence in x:
         if len(sentence) <= max_length:
             s = sentence + [['<PAD>']] * (max_length - len(sentence))
         if len(sentence) > max_length:
             s = sentence[:max_length]
-        s=feats_mlb.transform(s)
-        X.append(s)
+        inputs = {key:[] for key in feats.keys()}
+        for w in s:
+            added = {key:False for key in feats.keys()}
+
+            for f in w:
+                if f=='<PAD>':
+                    for key in feats.keys():
+                        inputs[key].append(0)
+                        added[key]=True
+                    break
+                try:
+                    key,value=f.split('=')
+                    inputs[key].append(feats[key][value])
+                    added[key]=True
+                except KeyError:
+                    inputs[key].append(1)
+                    added[key]=True
+                except ValueError:
+                    pass
+            for key in feats.keys():
+                if added[key]==False:
+                    inputs[key].append(1)
+
+        for key in feats.keys():
+            X[key].append(inputs[key])
     return X
 
 
-def encode_labels(y):  # Kevin
-    max_length=idx['max_length']
-    labels_lb=idx['labels']
-    Y=[]
-    for labels in y:
-        if len(labels) <= max_length:
-            l = labels + [['<PAD>']] * (max_length - len(labels))
-        if len(labels) > max_length:
-            l = labels[:max_length]
-        l=labels_lb.transform(l)
-        Y.append(l)
+def encode_labels(y, idx):  # Kevin
+    max_length = idx['max_length']
+    labels = idx['labels']
+    Y = []
+    for s in y:
+        outputs = []
+        if len(s) <= max_length:
+            s = s + ['<PAD>'] * (max_length - len(labels))
+        if len(s) > max_length:
+            s = s[:max_length]
+        for l in s:
+            outputs.append([labels[l]])
+        Y.append(outputs)
     return Y
 
 
@@ -93,3 +140,11 @@ def save_model_and_indexs():  # Kevin
 
 def learn():  # Ruizhe & Kevin
     pass
+
+
+if __name__ == '__main__':
+    x, y, sids, infos = load_data('nerc/train.feat',True)
+    #x, y, sids, infos = load_data('data/train')
+    idx = create_indexs(x, y, 100)
+    x_train = encode_words(x, idx)
+    y_train = encode_labels(y, idx)

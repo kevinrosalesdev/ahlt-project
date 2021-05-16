@@ -1,6 +1,6 @@
 # extract features for train and devel datasets
-#python3 feature-extractor.py data/train/ > train_summary.feat
-#python3 feature-extractor.py data/devel/ > devel_summary.feat
+#python3 feature_extractor.py data/train/ > train_summary.feat
+#python3 feature_extractor.py data/devel/ > devel_summary.feat
 # use train dataset to learn a model
 python3 learner.py mymodel_summary train_summary.feat mlb_summary
 # annotate devel dataset using learned model
