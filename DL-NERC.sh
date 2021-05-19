@@ -1,7 +1,7 @@
 # Use train dataset to learn a model,
 # use devel dataset for validation.
-python3 learner_NERC.py data/train data/devel mymodel
+# python3.7 learner_NERC.py data/train data/devel model
 # annotate devel dataset using learned model
-python3 classifier_NERC.py mymodel data/devel > devel.out
+python3.7 classifier_NERC.py model data/devel > devel.out
 # evaluate performance of the model
-python3 evaluator.pyc DDI data/devel/ devel.out
+python3.7 evaluator.pyc NER data/devel/ devel.out
