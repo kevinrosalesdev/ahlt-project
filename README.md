@@ -1,3 +1,3 @@
 - 1st Week [13-20]: NERC Task.
 - 2nd Week [20-27]: Optimize NERC & DDI Task.
-- 3rd Week [27-06]: Optimize DDI & Report.
+- 3rd Week [27-13]: Optimize DDI & Report.
