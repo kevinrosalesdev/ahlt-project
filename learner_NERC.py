@@ -3,7 +3,7 @@ import pickle
 import random
 import tensorflow as tf
 import numpy as np
-
+import re
 from os import listdir
 from xml.dom.minidom import parse
 from nerc.feature_extractor import tokenize, get_tag
@@ -64,6 +64,22 @@ def load_data(path):  # Ruizhe
                     features.append(f'pref2={tokens[i][0][:2]}')
                 features.append(f'suf1={tokens[i][0][-1:]}')
                 features.append(f'pref1={tokens[i][0][:1]}')
+                # # Capitalized
+                # if tokens[i][0].isupper():
+                #     features.append('capitalized=True')
+                # else:
+                #     features.append('capitalized=False')
+                #
+                # # With numbers
+                # if re.findall(r'[0-9]+', tokens[i][0]):
+                #     features.append("number=True")
+                # else:
+                #     features.append("number=False")
+                # With dashes
+                # if re.findall(r'-+', tokens[i][0]):
+                #     features.append("dash=True")
+                # else:
+                #     features.append("dash=False")
 
                 words.append(features)
                 words_offsets.append((tokens[i][1], tokens[i][2]))
@@ -139,18 +155,15 @@ def build_network(idx):  # Kevin
     # model = MaxPooling2D((n_feats,1))(model)
     # model = Dense(10, activation='relu')(tf.squeeze(model,axis=1))
 
-    # model = Conv1D(128, 5, activation='relu',padding='same')(model)
-    # model = MaxPooling2D((n_feats,1))(model)
-    # model = Dense(10, activation='relu')(tf.squeeze(model,axis=1))
-
     #LSTM Model
     model = Bidirectional(LSTM(units=50, return_sequences=True,dropout=0.2, recurrent_dropout=0.1))(tf.reduce_sum(model,axis=1))
     model = TimeDistributed(Dense(50, activation='relu'))(model)
     model = TimeDistributed(Dropout(0.5))(model)
-    out = Dense(n_labels, activation='softmax')(model)  # final output layer
+    out = Dense(n_labels, activation='softmax')(model)
 
-    # model = TimeDistributed(Dense(50, activation='relu'))(model)
+
     # CRF Layers
+    # model = TimeDistributed(Dense(50, activation='relu'))(model)
     # crf = CRF(units=max_len)
     # out = crf(model)
 
@@ -158,11 +171,11 @@ def build_network(idx):  # Kevin
     # create and compile model
     model = Model(inp, out)
 
-    # set appropriate parameters (optimizer, loss, etc.)
+    # (Non-CRF compile) set appropriate parameters (optimizer, loss, etc.)
     model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
     print(model.summary())
 
-    # CRF model
+    # (CRF compile)
     # model = ModelWithCRFLoss(model, sparse_target=False)
     # model.compile(optimizer='adam')
     return model
