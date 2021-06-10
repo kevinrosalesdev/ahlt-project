@@ -89,7 +89,9 @@ def predict(modelname, datadir):  # Kevin
     words_test, tags_test, sids_test, gt_test, offsets_test = load_data(datadir)
 
     # encode dataset
-    X = np.array(encode_words(words_test, idx)['form'])
+    feats_test=encode_words(words_test, idx)
+    selected=feats_test.keys()
+    X = np.stack([np.array(feats_test[key]) for key in selected],axis=1)
 
     # tag sentences in dataset
     Y = model.predict(X)
