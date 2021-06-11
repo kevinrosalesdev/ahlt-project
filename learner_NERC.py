@@ -233,6 +233,7 @@ def encode_labels(y, idx):  # Kevin
         for l in s:
             outputs.append([labels[l]])
         Y.append(np.array(outputs))
+
     return tf.keras.utils.to_categorical(Y)
 
 
